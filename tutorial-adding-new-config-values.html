@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Tutorial: input-validation</title>
+    <title>JSDoc: Tutorial: adding-new-config-values</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,79 +17,36 @@
 
 <div id="main">
 
-    <h1 class="page-title">Tutorial: input-validation</h1>
+    <h1 class="page-title">Tutorial: adding-new-config-values</h1>
 
     <section>
 
 <header>
     
 
-    <h2>input-validation</h2>
+    <h2>adding-new-config-values</h2>
 </header>
 
 <article>
-    <h1>Input Data Validation</h1>
-<p>When we receive input data from an upstream API, we perform input validation to:</p>
+    <h1>Adding New Config Values</h1>
+<p>The Badge Server supports a <a href="./server-secrets.md">variety of methods for defining configuration settings and secrets</a>, and provides a framework for loading those values during bootstrapping.</p>
+<p>Any new configuration setting or secret must be correctly registered so that it will be loaded at startup along with the others.</p>
+<p>This generally includes adding the corresponding information for your new setting(s)/secret(s) to the following locations:</p>
 <ul>
-<li>Ensure we won't throw a runtime error trying to render a badge</li>
-<li>Ensure we won't render badges with spurious or unexpected output e.g: <img src="https://img.shields.io/badge/version-null-blue" alt=""> <img src="https://img.shields.io/badge/coverage-NaN%25-red" alt=""> <img src="https://img.shields.io/badge/build-undefined-red" alt=""> <img src="https://img.shields.io/badge/coverage---10%25-critical" alt=""> etc</li>
-<li>Express and document our understanding of the input data</li>
+<li><a href="https://github.com/badges/shields/blob/master/core/server/server.js">core/server/server.js</a> - Add the new values to the <a href="https://github.com/badges/shields/blob/master/core/server/server.js#L118-L193">schemas</a>. Secrets/tokens/etc. should go in the <code>privateConfigSchema</code> while non-secret configuration settings should go in the <code>publicConfigSchema</code>.</li>
+<li><a href="https://github.com/badges/shields/blob/master/config/custom-environment-variables.yml">config/custom-environment-variables.yml</a></li>
+<li><a href="https://github.com/badges/shields/blob/master/doc/server-secrets.md">docs/server-secrets.md</a> (only applicable for secrets)</li>
+<li><a href="https://github.com/badges/shields/blob/master/config/default.yml">config/default.yml</a> (optional)</li>
+<li>Any other template config files (e.g. <code>config/local.template.yml</code>) (optional)</li>
 </ul>
-<h2>Writing schemas and validation</h2>
+<p>The exact values needed will depend on what type of secret/setting you are adding, but for reference a few commits are included below which added secrets and or settings:</p>
 <ul>
-<li>
-<p>The default validation mechanism should be to use <a href="https://github.com/sideway/joi">Joi</a> to define a schema for the input data. Validation against Joi schemas is implemented in the base classes and inherited by every service class that extends them. Sometimes additional manual validation is needed which can't be covered by Joi and plugins in which case we implement it by hand.</p>
-</li>
-<li>
-<p>If validation is implemented manually (because we need to enforce a constraint that can't be expressed with Joi), invalid data should throw an <a href="https://contributing.shields.io/module-core_base-service_errors-InvalidResponse.html">InvalidResponse</a> exception.</p>
-</li>
-<li>
-<p>Our definition of &quot;valid&quot; should not be stricter than the upstream API's definition of &quot;valid&quot;.</p>
-</li>
-<li>
-<p>The schema/validation we choose is informed by the assumptions we're making about the data. e.g:</p>
-<ul>
-<li>If we're going to use a value, make sure it exists.</li>
-<li>If we need to multiply it by something, we check it's a number.</li>
-<li>If we're going to call <code>.split()</code> on it, we make sure it's a string.</li>
-<li>If we're going to address <code>foo[0]</code>, <code>foo</code> must be an array.</li>
-<li>If we're going to sort a version on the assumption it is a semver, check it's a semver</li>
+<li>(secret) <a href="https://github.com/badges/shields/commit/8a9efb2fc99f97e78ab133c836ab1685803bf4df">8a9efb2fc99f97e78ab133c836ab1685803bf4df</a></li>
+<li>(secret) <a href="https://github.com/badges/shields/commit/bd6f4ee1465d14a8f188c37823748a21b6a46762">bd6f4ee1465d14a8f188c37823748a21b6a46762</a></li>
+<li>(secret) <a href="https://github.com/badges/shields/commit/0fd557d7bb623e3852c92cebac586d5f6d6d89d8">0fd557d7bb623e3852c92cebac586d5f6d6d89d8</a></li>
+<li>(configuration setting) <a href="https://github.com/badges/shields/commit/b1fc4925928c061234e9492f3794c0797467e123">b1fc4925928c061234e9492f3794c0797467e123</a></li>
 </ul>
-</li>
-<li>
-<p>We don't need to validate characteristics we don't rely on. For example, if we're just going to render a version on a badge with the same exact value from the API response and do not need to sort or transform the value, then it doesn't matter what format the version number is in. We can use a very relaxed schema to validate in this case, e.g. <code>Joi.string().required()</code></p>
-</li>
-<li>
-<p>If theory (docs) and practice (real-world API responses) conflict, real-world outputs take precedence over documented behaviour. e.g: if the docs say version is a semver but we learn that there are real-world packages where the version number is <code>0.3b</code> or <code>1.2.1.27</code> then we should accept those values in preference to enforcing the documented API behaviour.</p>
-</li>
-<li>
-<p>Shields is descriptive rather than prescriptive. We reflect the established norms of the communities we serve.</p>
-</li>
-<li>
-<p>It is fine to define a single schema which is applied to multiple badges. For example, we could define a schema that says:</p>
-<pre class="prettyprint source lang-js"><code>const schema = Joi.object({
-  license: Joi.string().required(),
-  version: Joi.string().required(),
-}).required()
-</code></pre>
-<p>and have both the license and version badges validate the response against that schema.</p>
-</li>
-<li>
-<p>For build status badges there is a shared <a href="https://github.com/badges/shields/blob/master/services/build-status.js">isBuildStatus</a> validator. In most cases build status badges should use <code>isBuildStatus</code> or input validation and <code>renderBuildStatusBadge</code> should be used for rendering. Any additional status values can be added to the relevant color arrays.</p>
-</li>
-</ul>
-<h2>Identifying problems</h2>
-<ul>
-<li>
-<p>If we know of a real-world example of a package/repo/etc that causes us to render an invalid value on a badge (e.g: <img src="https://img.shields.io/badge/version-null-blue" alt=""> <img src="https://img.shields.io/badge/coverage-NaN%25-red" alt=""> <img src="https://img.shields.io/badge/build-undefined-red" alt=""> ) our input validation is broken and we should fix it.</p>
-</li>
-<li>
-<p>If we know of a real-world example of a package/repo/etc that causes us to throw an unhandled runtime exception, our input validation is broken and we should fix it.</p>
-</li>
-<li>
-<p>We should not fail to render a badge because of a validation failure on a field that isn't necessary to render the badge. In the above example of a shared license/version schema: If we become aware of a real-world example of a package/repo/etc that has a <code>version</code> key but not a <code>license</code> key then we should split the schema (or make <code>version</code> optional and handle the error in code).</p>
-</li>
-</ul>
+<p>Don't hesitate to reach out if you're unsure of the exact values needed for your new secret/setting, or have any other questions. Feel free to post questions on your corresponding Issue/Pull Request, and/or ping us on the <code>contributing</code> channel on our Discord server.</p>
 </article>
 
 </section>
